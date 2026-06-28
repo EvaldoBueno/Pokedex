@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Pokédex Insana - Prototipagem</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    :root {
+      --bg-primary: #12121a;
+      --bg-card: #1a1a2e;
+      --accent: #ff4757;
+      --text: #ffffff;
+    }
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', Arial, sans-serif;
+      text-align: center;
+      background: var(--bg-primary);
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      padding: 20px;
+      box-sizing: border-box;
+    }
+    .phone-container {
+      width: 100%;
+      max-width: 400px;
+      background: var(--bg-card);
+      border-radius: 30px;
+      padding: 25px;
+      box-shadow: 0 15px 35px rgba(0,0,0,0.5);
+      border: 2px solid #2e2e4e;
+    }
+    h1 {
+      margin-top: 0;
+      font-size: 24px;
+      letter-spacing: 2px;
+      color: var(--accent);
+    }
+    .search-box {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    input {
+      flex: 1;
+      padding: 12px;
+      border-radius: 12px;
+      border: 1px solid #3e3e68;
+      background: #252542;
+      color: white;
+      outline: none;
+    }
+    button {
+      padding: 12px 18px;
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+      background: var(--accent);
+      color: white;
+      font-weight: bold;
+      transition: transform 0.2s, background 0.2s;
+    }
+    button:hover {
+      transform: scale(1.05);
+      background: #ff6b81;
+    }
+    .card {
+      background: #252542;
+      border-radius: 20px;
+      padding: 20px;
+      margin-bottom: 20px;
+      transition: background 0.5s ease;
+    }
+    img {
+      width: 160px;
+      height: 160px;
+      filter: drop-shadow(0px 8px 8px rgba(0,0,0,0.3));
+      animation: float 3s ease-in-out infinite;
+    }
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-10px); }
+    }
+    .nav-buttons {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 25px;
+    }
+    .nav-buttons button {
+      flex: 1;
+      background: #3e3e68;
+      font-size: 16px;
+    }
+    .section {
+      background: #252542;
+      border-radius: 15px;
+      padding: 15px;
+      margin-top: 15px;
+      text-align: left;
+    }
+    .section h3 { margin-top: 0; border-bottom: 1px solid #3e3e68; padding-bottom: 5px; }
+    .log-item {
+      font-size: 12px;
+      background: rgba(0,0,0,0.2);
+      padding: 6px;
+      border-radius: 6px;
+      margin-bottom: 5px;
+    }
+  </style>
+</head>
+<body>
+
+<div class="phone-container">
+  <h1>POKÉDEX PRO</h1>
+
+  <div class="search-box">
+    <input id="search" placeholder="Nome ou ID do Pokémon...">
+    <button id="btnSearch">Buscar</button>
+  </div>
+
+  <p id="loading" style="min-height: 20px;"></p>
+
+  <div class="card" id="pokeCard">
+    <img id="img" src="" alt="">
+    <h2 id="name" style="margin: 10px 0 5px 0;">---</h2>
+    <p id="pokeId" style="margin: 0; opacity: 0.7;">ID: --</p>
+    <p id="type" style="margin: 10px 0 0 0; font-weight: bold; text-transform: uppercase;"></p>
+  </div>
+
+  <div class="nav-buttons">
+    <button id="prev">◀️</button>
+    <button id="home">🏠</button>
+    <button id="next">▶️</button>
+    <button id="random">🎲</button>
+    <button id="favorite">⭐</button>
+  </div>
+
+  <div class="section">
+    <h3>⭐ Favoritos (Firebase Sim)</h3>
+    <p id="favorites" style="word-wrap: break-word;">Nenhum favoritado</p>
+  </div>
+
+  <div class="section">
+    <h3>📝 Logs do Sistema</h3>
+    <div id="logs"></div>
+  </div>
+</div>
+
+<script>
+let currentId = 1;
+let favorites = JSON.parse(localStorage.getItem("favorites")) || [];
+let logs = [];
+
+const el = {
+  name: document.getElementById("name"),
+  img: document.getElementById("img"),
+  pokeId: document.getElementById("pokeId"),
+  type: document.getElementById("type"),
+  loading: document.getElementById("loading"),
+  logs: document.getElementById("logs"),
+  favorites: document.getElementById("favorites"),
+  search: document.getElementById("search"),
+  card: document.getElementById("pokeCard")
+};
+
+const colors = {
+  fire: "#ff6b6b", water: "#3498db", grass: "#2ecc71",
+  electric: "#f1c40f", psychic: "#9b59b6", normal: "#95a5a6",
+  bug: "#7bed9f", poison: "#a55eea", ground: "#f7b731"
+};
+
+function addLog(msg) {
+  logs.push(`[${new Date().toLocaleTimeString()}] ${msg}`);
+  if (logs.length > 3) logs.shift();
+  el.logs.innerHTML = "";
+  logs.forEach(l => {
+    const div = document.createElement("div");
+    div.className = "log-item";
+    div.innerText = l;
+    el.logs.appendChild(div);
+  });
+}
+
+async function fetchPokemon(value) {
+  try {
+    el.loading.innerText = "Buscando dados na PokeAPI...";
+    const res = await fetch(`https://pokeapi.co/api/v2/pokemon/${value}`);
+    if (!res.ok) throw new Error();
+    
+    const data = await res.json();
+    currentId = data.id;
+    const name = data.name.charAt(0).toUpperCase() + data.name.slice(1);
+
+    el.name.innerText = name;
+    el.img.src = data.sprites.other['official-artwork'].front_default || data.sprites.front_default;
+    el.pokeId.innerText = "ID: " + data.id;
+
+    const t1 = data.types[0].type.name;
+    el.type.innerText = t2 = data.types[1] ? `${t1} / ${data.types[1].type.name}` : t1;
+    el.card.style.background = colors[t1] || "#252542";
+
+    addLog("Sucesso: " + name);
+  } catch (error) {
+    alert("Pokémon não encontrado.");
+    addLog("Falha na busca");
+  } finally { el.loading.innerText = ""; }
+}
+
+document.getElementById("next").onclick = () => { currentId++; fetchPokemon(currentId); };
+document.getElementById("prev").onclick = () => { if (currentId > 1) { currentId--; fetchPokemon(currentId); } };
+document.getElementById("home").onclick = () => { currentId = 1; fetchPokemon(currentId); };
+document.getElementById("random").onclick = () => { currentId = Math.floor(Math.random() * 1025) + 1; fetchPokemon(currentId); };
+document.getElementById("btnSearch").onclick = () => {
+  const v = el.search.value.toLowerCase().trim();
+  if(v) { fetchPokemon(v); el.search.value = ""; }
+};
+
+document.getElementById("favorite").onclick = () => {
+  const name = el.name.innerText;
+  if (name && name !== "---") {
+    if (!favorites.includes(name)) {
+      favorites.push(name);
+      localStorage.setItem("favorites", JSON.stringify(favorites));
+      el.favorites.innerText = favorites.join(", ");
+      addLog("Criado no Banco: " + name);
+    }
+  }
+};
+
+el.favorites.innerText = favorites.length ? favorites.join(", ") : "Nenhum favoritado";
+fetchPokemon(1);
+</script>
+</body>
+</html>
